@@ -1,30 +1,25 @@
-# Build the fbsd-config man page. Works with FreeBSD make and GNU make.
+# Portable: works with FreeBSD make (bmake) and GNU make.
+# Requires groff from ports/pkg:  pkg install groff
 
-PAGE=	fbsd-config
-SECT=	7
-SRC=	${PAGE}.${SECT}
-PREFIX?=	/usr/local
-MANDIR?=	${PREFIX}/share/man/man${SECT}
+NAME  = document
+GROFF = groff -t -ms
 
-all: ${PAGE}.txt ${PAGE}.html
+all: ${NAME}.pdf
 
-${PAGE}.txt: ${SRC}
-	mandoc -T utf8 ${SRC} | col -b > $@
+pdf: ${NAME}.pdf
 
-${PAGE}.html: ${SRC}
-	mandoc -T html -O style=style.css ${SRC} > $@
+txt: ${NAME}.txt
 
-lint:
-	mandoc -T lint ${SRC}
+${NAME}.pdf: ${NAME}.ms
+	${GROFF} -Tpdf ${NAME}.ms > ${NAME}.pdf
 
-view:
-	mandoc -T utf8 ${SRC} | less -R
+${NAME}.txt: ${NAME}.ms
+	${GROFF} -Tutf8 ${NAME}.ms | col -bx > ${NAME}.txt
 
-install: ${SRC}
-	install -d ${MANDIR}
-	install -m 444 ${SRC} ${MANDIR}/
+view: ${NAME}.txt
+	less ${NAME}.txt
 
 clean:
-	rm -f ${PAGE}.txt ${PAGE}.html
+	rm -f ${NAME}.pdf ${NAME}.txt
 
-.PHONY: all lint view install clean
+.PHONY: all pdf txt view clean

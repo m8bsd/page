@@ -1,32 +1,49 @@
-# fbsd-config
+# Simple roff project (FreeBSD)
 
-A small roff project: an `mdoc(7)` manual page that maps out FreeBSD's
-configuration files (`rc.conf`, `loader.conf`, `sysctl.conf`, and friends).
+A minimal groff document using the `ms` macro package.
 
 ## Files
 
-- `fbsd-config.7` - the man page source (mdoc macros)
-- `Makefile` - lint, render, and install targets
-
-## Usage
-
-    make lint       # check the page for mistakes
-    make            # build fbsd-config.txt and fbsd-config.html
-    make view       # read it in your pager
-    make install    # install to /usr/local/share/man/man7 (may need root)
-    make clean      # remove generated files
-
-View without building:
-
-    mandoc fbsd-config.7 | less
-    man ./fbsd-config.7
+- `document.ms` - the source document
+- `Makefile` - build rules (works with FreeBSD `make`)
 
 ## Requirements
 
-`mandoc` and `col`, both in the FreeBSD base system. On other systems,
-install `mandoc`, or use `groff -mdoc -T utf8 fbsd-config.7`.
+FreeBSD's base system only includes `mandoc`, so install groff:
 
-## Extending
+    pkg install groff
 
-Add more pages (for example `myapp.conf.5`) by copying `fbsd-config.7`
-and adding a matching entry to the `Makefile`.
+This puts `groff` in `/usr/local/bin`. Make sure that is in your `PATH`.
+
+## Build
+
+    make          # builds document.pdf
+    make txt      # builds plain-text document.txt
+    make view     # preview in the terminal
+    make clean    # remove generated files
+
+Without make:
+
+    groff -t -ms -Tpdf document.ms > document.pdf
+    groff -t -ms -Tutf8 document.ms | less
+
+## Notes
+
+- If you only want to use what ships with the base system, `mandoc`
+  handles man pages (`-man` / `-mdoc`), but not the `ms` macros or
+  `tbl`-heavy documents like this one. Use groff for those.
+- Open the PDF with a viewer such as `pkg install zathura-pdf-poppler`
+  or `pkg install xpdf`.
+
+## Cheat sheet
+
+| Request | Meaning |
+|---------|---------|
+| `.TL` / `.AU` / `.AI` | Title, author, institution |
+| `.AB` / `.AE` | Abstract begin / end |
+| `.NH [level]` | Numbered heading |
+| `.PP` | New paragraph |
+| `.IP mark indent` | Indented list item |
+| `.DS` / `.DE` | Display (preformatted) block |
+| `.TS` / `.TE` | Table (needs `-t`) |
+| `\fBbold\fP`, `\fIitalic\fP` | Inline fonts |
