@@ -1,0 +1,120 @@
+#!/bin/sh
+
+print_date() {
+	# The date is printed to the status bar by default.
+	# To print the date through this script, set clock_enabled to 0
+	# in spectrwm.conf.  Uncomment "print_date" below.
+	#FORMAT="%a %b %d %R %Z %Y"
+	FORMAT="%T %d-%m-%y"
+	DATE=$(date "+${FORMAT}")
+	echo -n "${DATE}"
+}
+
+# Convert bytes to mb
+mb() {
+	echo -n $1/2^20 | bc
+}
+
+# Calculate percentage
+percent() {
+	echo -n "scale=4; ($1 / $2) * 100"  | bc | cut -d . -f1
+}
+
+print_mem() {
+	# This i can understand...
+	#mem_phys=$(sysctl hw.physmem | sed 's/^.*: //')
+	mem_phys=$(sysctl -n hw.physmem)
+
+	# Oh god....
+	mem_pagesize=$(sysctl -n hw.pagesize)
+
+	# Makes sense, fully available for allocation
+	mem_free=$(echo "$(sysctl -n vm.stats.vm.v_free_count) * $mem_pagesize" | bc)
+	
+	# I guess recently allocated but unused
+	mem_inactive=$(echo "$(sysctl -n vm.stats.vm.v_inactive_count) * $mem_pagesize" | bc)
+	
+	# Calculate available memory
+	mem_avail=$(echo "$mem_free + $mem_inactive" | bc)
+
+	# Calculate used memory
+	mem_used=$(echo "$mem_phys - $mem_avail" | bc)
+	
+	used_p=$(percent $mem_used $mem_phys)
+
+	# Display
+	#echo -n "Used: $(mb $mem_used) MB | free: $(mb $mem_free) MB | phys: $(mb $mem_phys) MB"
+	#echo -n "$(mb $mem_used)mb / $(mb $mem_phys)mb ($used_p%)"
+	echo -n "$(mb $mem_used) MB ($used_p%)"
+}
+
+print_disk() {
+	disk=$(df -h | grep -m 1 /dev/)
+	size=$(echo $disk | awk '{print $2}' | cut -d 'G' -f 1)
+	used=$(echo $disk | awk '{print $3}' | cut -d 'G' -f 1)
+	used_p=$(percent $used $size)
+	
+	#echo -n "${used}G / ${size}G ($used_p%)"
+	echo -n "${used} GB ($used_p%)"
+}
+
+print_vol() {
+	muted=$(mixer vol.mute | cut -d "=" -f 2)
+	vol_raw=$(mixer vol.volume | cut -d ":" -f 2)
+	vol="$(echo "$vol_raw * 100" | bc | cut -d . -f 1)"
+	vol_str=""
+	#if [ $muted = 1 ] || [ $vol = 0 ]; then
+	if [ $muted = 1 ]; then
+		vol_str="+@fg=2;muted+@fg=0;"
+	else
+		vol_str="+@fg=4;$vol%+@fg=0;"
+	fi
+
+	echo -n "$vol_str"
+}
+
+print_bat() {
+	bat_p=$(acpiconf -i 0 | grep "Remaining capacity" | cut -d ":" -f 2 | tr -d '\t' | cut -d "%" -f 1)
+	bat_state=$(acpiconf -i 0 | grep "State" | cut -d ":" -f 2 | tr -d '\t')
+	
+	bat_p_clr="+@fg=0;$bat_p%+@fg=0;"
+	bat_str="err"
+
+	
+	if [ $bat_p -gt 49 ]; then 
+		bat_p_clr="+@fg=3;$bat_p%+@fg=0;"
+	elif [ $bat_p -lt 21  ]; then
+		bat_p_clr="+@fg=2;$bat_p%+@fg=0;"
+	else
+		bat_p_clr="+@fg=4;$bat_p%+@fg=0;"
+	fi
+
+	if [ "$bat_state" = "charging" ]; then
+		bat_str="up"
+	elif [ "$bat_state" = "discharging" ]; then
+		bat_str="down"
+	else
+		bat_str="idle"
+	fi
+
+	#echo -n "$bat_state $bat_str $bat_cap"
+	echo -n "$bat_p_clr +@fg=8;$bat_str+@fg=0;"
+}
+
+print_backlight() {
+	# Relies on loading acpi_fujitsu for my old fujitsu laptop, query with 'hw.acpi.fujitsu.lcd_brightness'
+	# newer/other laptops can just use the generic acpi_video and the command 'backlight' or 'hw.acpi.video.lcd0.brightness'
+	lcd_light=$(sysctl hw.acpi.fujitsu.lcd_brightness | cut -d ":" -d " " -f 2)
+	lcd_p=$(echo "$lcd_light*100/11" | bc)
+	echo -n "+@fg=4;$lcd_p%+@fg=0;"
+}
+
+# Color section text
+tx() {
+	echo -n "+@fg=8;| +@fg=1;$1+@fg=0;"
+}
+
+while :; do
+	echo "$(tx "vol") $(print_vol) $(tx "lcd") $(print_backlight)  $(tx "mem") +@fg=3;$(print_mem)+@fg=0; $(tx "hdd") +@fg=5;$(print_disk)+@fg=0; $(tx "dat") +@fg=6;$(print_date)+@fg=0; $(tx "bat") $(print_bat) "
+	sleep 1
+done
